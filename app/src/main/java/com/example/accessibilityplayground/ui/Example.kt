@@ -10,15 +10,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableIntState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.accessibilityplayground.ui.theme.AccessibilityPlaygroundTheme
 import com.example.accessibilityplayground.util.AccessibilityUtils
+import com.example.accessibilityplayground.util.AccessibilityUtils.liveRegionRequest
 import com.example.accessibilityplayground.util.AccessibilityUtils.traversalFocusRequest
 import com.example.accessibilityplayground.util.AccessibilityUtils.traversalOrder
+import com.example.accessibilityplayground.util.Announcement
+import com.example.accessibilityplayground.util.LiveRegionRequest
 import com.example.accessibilityplayground.util.TraversalFocusRequest
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun ColumnScope.CustomBox(color: Color, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -49,7 +59,7 @@ fun ModifiedTraversalOrder1() {
             white,
             yellow,
             green
-        ) = AccessibilityUtils.createRefs()
+        ) = AccessibilityUtils.createTraversalRefs()
 
         CustomBox(modifier = Modifier.traversalOrder(yellow), color = Color.Yellow) {
             Text(text = "Second")
@@ -71,7 +81,7 @@ fun ModifiedTraversalOrder2() {
             yellow,
             green,
             blue
-        ) = AccessibilityUtils.createRefs()
+        ) = AccessibilityUtils.createTraversalRefs()
 
         CustomBox(modifier = Modifier.traversalOrder(yellow), color = Color.Yellow) {
             Text(text = "Second")
@@ -95,7 +105,7 @@ fun DeepTraversalOrder1() {
             first,
             second,
             third
-        ) = AccessibilityUtils.createRefs()
+        ) = AccessibilityUtils.createTraversalRefs()
 
         Row(
             modifier = Modifier
@@ -130,7 +140,7 @@ fun DeepTraversalOrder2() {
             fourth,
             fifth,
             sixth
-        ) = AccessibilityUtils.createRefs()
+        ) = AccessibilityUtils.createTraversalRefs()
 
         Row(modifier = Modifier.weight(1f)) {
             Column(modifier = Modifier.weight(1f)) {
@@ -166,7 +176,7 @@ fun MultiLevelDeepTraversalOrder() {
             rootFirst,
             rootSecond,
             rootThird
-        ) = AccessibilityUtils.createRefs()
+        ) = AccessibilityUtils.createTraversalRefs()
 
         Row(
             modifier = Modifier
@@ -178,7 +188,7 @@ fun MultiLevelDeepTraversalOrder() {
                 yellowSecond,
                 yellowThird,
                 yellowFourth
-            ) = AccessibilityUtils.createRefs()
+            ) = AccessibilityUtils.createTraversalRefs()
 
             Column(modifier = Modifier.weight(1f)) {
                 CustomBox(modifier = Modifier.traversalOrder(yellowThird), color = Color.Yellow) {
@@ -220,6 +230,74 @@ fun InterruptingTraversalOrder() {
         CustomBox(color = Color.Cyan) { Text(text = "Fifth") }
         Button(modifier = Modifier.fillMaxWidth(), onClick = { traversalFocusRequest.requestTraversalFocus() }) {
             Text(text = "Jump to Second")
+        }
+    }
+}
+
+@Composable
+fun InterruptingLiveRegion() {
+    Column(modifier = Modifier.fillMaxSize()) {
+        val liveRegionRequest2 = LiveRegionRequest()
+        val liveRegionRequest3 = LiveRegionRequest()
+        val liveRegionRequestAnnouncement = LiveRegionRequest()
+
+        val coroutineScope = rememberCoroutineScope()
+        val counterAssertive = remember { mutableIntStateOf(0) }
+        val counterPolite = remember { mutableIntStateOf(0) }
+        val waitForAction: (counter: MutableIntState, action: () -> Unit) -> Unit = { counter, action ->
+            coroutineScope.launch {
+                counter.intValue = 3
+                while (counter.intValue != 0) {
+                    delay(500)
+                    counter.intValue--
+                }
+                action.invoke()
+            }
+        }
+        val getCounterText: (counter: MutableIntState) -> String = { counter ->
+            counter.intValue.takeIf { it != 0 }?.toString() ?: ""
+        }
+
+        Announcement(
+            liveRegionRequest = liveRegionRequestAnnouncement,
+            contentDescription = "This is an announcement that can be invoked anytime"
+        )
+
+        CustomBox(color = Color.White) { Text(text = "White") }
+        CustomBox(color = Color.Yellow) {
+            Text(modifier = Modifier.liveRegionRequest(liveRegionRequest2), text = "Yellow")
+        }
+        CustomBox(color = Color.Green) {
+            Text(modifier = Modifier.liveRegionRequest(liveRegionRequest3), text = "Green")
+        }
+        CustomBox(color = Color.Magenta) { Text(text = "Magenta") }
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                waitForAction(counterAssertive) {
+                    liveRegionRequest2.requestLiveRegionMode(LiveRegionMode.Assertive)
+                }
+            }
+        ) {
+            Text(text = "Read the Second field assertively ${getCounterText(counterAssertive)}")
+        }
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                waitForAction(counterPolite) {
+                    liveRegionRequest3.requestLiveRegionMode(LiveRegionMode.Polite)
+                }
+            }
+        ) {
+            Text(text = "Read the Third field politely ${getCounterText(counterPolite)}")
+        }
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                liveRegionRequestAnnouncement.requestLiveRegionMode(LiveRegionMode.Assertive)
+            }
+        ) {
+            Text(text = "Read announcement")
         }
     }
 }
@@ -277,5 +355,14 @@ fun MultiLevelDeepTraversalOrderPreview() {
 fun InterruptingTraversalOrderPreview() {
     AccessibilityPlaygroundTheme {
         InterruptingTraversalOrder()
+    }
+}
+
+
+@Preview(widthDp = 200, heightDp = 300)
+@Composable
+fun InterruptingLiveRegionPreview() {
+    AccessibilityPlaygroundTheme {
+        InterruptingLiveRegion()
     }
 }
