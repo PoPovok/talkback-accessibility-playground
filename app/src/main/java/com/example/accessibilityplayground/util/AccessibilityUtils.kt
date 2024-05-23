@@ -1,13 +1,11 @@
 package com.example.accessibilityplayground.util
 
 import androidx.compose.foundation.focusable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.semantics.focused
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
@@ -39,21 +37,14 @@ object AccessibilityUtils {
      * semantics(mergeDescendants = true) is necessary to work with parent composables like Box, Column, Row
      */
     fun Modifier.traversalFocusRequest(traversalRequestFocus: TraversalFocusRequest, mergeDescendants: Boolean = true) =
-        composed(
-            factory = {
-                traversalRequestFocus.let {
-                    LaunchedEffect(it.state.isFocused) {
-                        it.onFocusStateChanged()
-                    }
-
-                    LaunchedEffect(it.state.isTriggered) {
-                        it.onTriggerStateChanged()
-                    }
-
-                    this.then(Modifier.semantics(mergeDescendants = mergeDescendants) { focused = it.state.isFocused })
+        then(Modifier.semantics(mergeDescendants = mergeDescendants) {
+            traversalRequestFocus.let {
+                focused = it.isFocused
+                if (it.isFocused) {
+                    it.onFocusStateChanged()
                 }
             }
-        )
+        })
 
     /**
      * Example:
@@ -83,55 +74,28 @@ object AccessibilityUtils {
 }
 
 /**
- * Provide it to only one composable
+ * An object can be provided to only one composable
  */
 class TraversalFocusRequest {
     private val traversalFocusRequestState = TraversalFocusRequestState()
-    internal val state
+    internal val isFocused
         get() = traversalFocusRequestState.value
 
-    internal fun onTriggerStateChanged() {
-        if (state.isTriggered) {
-            traversalFocusRequestState.onStateChanged(TraversalFocusRequestState.TraversalFocusState.Focused)
-        }
-    }
-
     internal fun onFocusStateChanged() {
-        if (state.isFocused) {
-            traversalFocusRequestState.onStateChanged(TraversalFocusRequestState.TraversalFocusState.Unfocused)
+        if (isFocused) {
+            traversalFocusRequestState.onStateChanged(isFocused = false)
         }
     }
 
     fun requestTraversalFocus() {
-        traversalFocusRequestState.onStateChanged(TraversalFocusRequestState.TraversalFocusState.Triggered)
+        traversalFocusRequestState.onStateChanged(isFocused = true)
     }
 }
 
-internal data class TraversalFocusProperties(
-    val isTriggered: Boolean = false,
-    val isFocused: Boolean = false
-)
+internal class TraversalFocusRequestState : State<Boolean> {
+    override var value: Boolean by mutableStateOf(false)
 
-internal class TraversalFocusRequestState : State<TraversalFocusProperties> {
-    override var value: TraversalFocusProperties by mutableStateOf(TraversalFocusProperties())
-
-    sealed class TraversalFocusState {
-        abstract val properties: TraversalFocusProperties
-
-        data object Triggered : TraversalFocusState() {
-            override val properties = TraversalFocusProperties(isTriggered = true, isFocused = false)
-        }
-
-        data object Focused : TraversalFocusState() {
-            override val properties = TraversalFocusProperties(isTriggered = false, isFocused = true)
-        }
-
-        data object Unfocused : TraversalFocusState() {
-            override val properties = TraversalFocusProperties(isTriggered = false, isFocused = false)
-        }
-    }
-
-    fun onStateChanged(newState: TraversalFocusState) {
-        value = newState.properties
+    fun onStateChanged(isFocused: Boolean) {
+        value = isFocused
     }
 }
