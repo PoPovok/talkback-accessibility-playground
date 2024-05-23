@@ -41,7 +41,8 @@ enum class Page {
     DEEP1,
     DEEP2,
     MULTI_LEVEL,
-    INTERRUPTING
+    INTERRUPTING_FOCUS,
+    INTERRUPTING_READ
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -74,7 +75,8 @@ fun CustomPager() {
                 Page.DEEP1 -> DeepTraversalOrder1()
                 Page.DEEP2 -> DeepTraversalOrder2()
                 Page.MULTI_LEVEL -> MultiLevelDeepTraversalOrder()
-                Page.INTERRUPTING -> InterruptingTraversalOrder()
+                Page.INTERRUPTING_FOCUS -> InterruptingTraversalOrder()
+                Page.INTERRUPTING_READ -> InterruptingLiveRegion()
             }
         }
         if (areButtonsVisible) {
